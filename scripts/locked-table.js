@@ -26,14 +26,15 @@ LockedTable - 定义允许左右锁定若干列显示的高级表格的基本操
 属性
 _nLeft       - 最左部未锁定列的序号
 _nRight      - 最右部未锁定列的后续序号，即未锁定的列序号+1
+_aLockedRow  - 用于显示锁定区域的行控件数组
 _uLockedHead - 锁定的表头区
 _uLockedMain - 锁定的行内容区
 
 表格行与锁定行属性
-_eFill       - 用于控制中部宽度的单元格
+_cJoint      - 行(锁定行)对应的锁定行(行)控件
 */
 //{if 0}//
-(function () {
+(function() {
 
     var core = ecui,
         array = core.array,
@@ -48,27 +49,31 @@ _eFill       - 用于控制中部宽度的单元格
         children = dom.children,
         createDom = dom.create,
         getParent = dom.getParent,
+        getAttribute = dom.getAttribute,
         insertBefore = dom.insertBefore,
+        removeDom = dom.remove,
         blank = util.blank,
         toNumber = util.toNumber,
 
         $fastCreate = core.$fastCreate,
+        disposeControl = core.dispose,
+        $bind = core.$bind,
         inheritsControl = core.inherits,
 
         eventNames = [
             'mousedown', 'mouseover', 'mousemove', 'mouseout', 'mouseup',
             'click', 'dblclick', 'focus', 'blur', 'activate', 'deactivate',
             'keydown', 'keypress', 'keyup', 'mousewheel'
-        ],
+        ];
 
-        UI_CONTROL = ui.Control,
+    var UI_CONTROL = ui.Control,
         UI_CONTROL_CLASS = UI_CONTROL.prototype,
         UI_TABLE = ui.Table,
         UI_TABLE_CLASS = UI_TABLE.prototype,
-        UI_TABLE_ROW = UI_TABLE.Row,
+        UI_TABLE_ROW = UI_TABLE_CLASS.Row,
         UI_TABLE_ROW_CLASS = UI_TABLE_ROW.prototype;
-//{/if}//
-//{if $phase == "define"}//
+    //{/if}//
+    //{if $phase == "define"}//
     /**
      * 初始化高级表格控件。
      * options 对象支持的属性如下：
@@ -84,65 +89,73 @@ _eFill       - 用于控制中部宽度的单元格
         inheritsControl(
             UI_TABLE,
             '*locked-table',
-            function (el, options) {
+            null,
+            function(el, options) {
                 var i = 0,
                     type = this.getType(),
                     headRows = this._aHeadRows,
                     rows = headRows.concat(this._aRows),
                     lockedEl = createDom('', 'position:absolute;top:0px;left:0px;overflow:hidden'),
                     list = [],
+                    lockedRows = this._aLockedRow = [],
+                    lockedHeadRows = this._aLockedHeadRow = [],
                     o;
 
                 this._nLeft = options.leftLock || 0;
                 this._nRight = this.getColumnCount() - (options.rightLock || 0);
 
                 // 以下使用 options 代替 rows
-                for (; el = rows[i]; ) {
+                for (; el = rows[i];) {
                     el = el.getMain();
                     list[i++] =
                         '<tr class="' + el.className + '" style="' + el.style.cssText +
-                            '"><td style="padding:0px;border:0px"></td></tr>';
+                        '"><td style="padding:0px;border:0px"></td></tr>';
                 }
 
                 lockedEl.innerHTML =
-                    '<div class="' + type + '-head"><div style="white-space:nowrap;position:absolute"><table cellspacing="0"><thead>' + list.splice(0, headRows.length).join('') + '</thead></table></div></div><div class="' + type + '-layout" style="position:relative;overflow:hidden"><div style="white-space:nowrap;position:absolute;top:0px;left:0px"><table cellspacing="0"><tbody>' + list.join('') + '</tbody></table></div></div>';
+                    '<div class="' + type + '-locked-head" style="position:absolute;top:0px;left:0px"><div style="white-space:nowrap;position:absolute"><table cellspacing="0"><thead>' + list.splice(0, headRows.length).join('') + '</thead></table></div></div><div class="' + type + '-locked-layout" style="position:absolute;left:0px;overflow:hidden"><div style="white-space:nowrap;position:absolute;top:0px;left:0px"><table cellspacing="0"><tbody>' + list.join('') + '</tbody></table></div></div>';
                 // 初始化锁定的表头区域，以下使用 list 表示临时变量
                 o = this._uLockedHead = $fastCreate(UI_CONTROL, lockedEl.firstChild, this);
                 o.$setBody(el = o.getMain().lastChild.lastChild.firstChild);
 
-                for (i = 0, list = children(el); o = list[i]; ) {
-                    UI_LOCKED_TABLE_CREATE_LOCKEDROW(o, headRows[i++]);
+                for (i = 0, list = children(el); o = list[i];) {
+                    lockedHeadRows[i] = UI_LOCKED_TABLE_CREATE_LOCKEDROW(this, o, headRows[i++]);
                 }
 
                 o = this._uLockedMain = $fastCreate(UI_CONTROL, el = lockedEl.lastChild, this);
                 o.$setBody(el = el.lastChild);
 
-                for (i = 0, list = children(el.lastChild.lastChild); o = list[i]; ) {
-                    UI_LOCKED_TABLE_CREATE_LOCKEDROW(o, this._aRows[i++]);
+                for (i = 0, list = children(el.lastChild.lastChild); o = list[i];) {
+                    lockedRows[i] = UI_LOCKED_TABLE_CREATE_LOCKEDROW(this, o, this._aRows[i++]);
                 }
-                insertBefore(lockedEl, getParent(this.getBody()));
+                //insertBefore(lockedEl, getParent(this.getBody()));
+                insertBefore(lockedEl.firstChild, this._uHead.getOuter());
+                insertBefore(lockedEl.firstChild, getParent(this.getBody()));
             }
         );
-        UI_LOCKED_TABLE_CLASS = UI_LOCKED_TABLE.prototype,
+    UI_LOCKED_TABLE_CLASS = UI_LOCKED_TABLE.prototype,
 
-        /**
-         * 初始化高级表格控件的行部件。
-         * @public
-         *
-         * @param {Object} options 初始化选项
-         */
-        UI_LOCKED_TABLE_ROW_CLASS = (UI_LOCKED_TABLE_CLASS.Row = inheritsControl(UI_TABLE_CLASS.Row)).prototype;
-//{else}//
+    /**
+     * 初始化高级表格控件的行部件。
+     * @public
+     *
+     * @param {Object} options 初始化选项
+     */
+    UI_LOCKED_TABLE_ROW_CLASS = (UI_LOCKED_TABLE_CLASS.Row = inheritsControl(UI_TABLE_CLASS.Row)).prototype;
+    //{else}//
     /**
      * 建立锁定行控件。
      * @private
      *
+     * @param {ecui.ui.LockedTable} table 锁定表控件
      * @param {HTMLElement} el 锁定行的 Element 元素
      * @param {ecui.ui.Table.Row} row 表格基本行控件
      */
-    function UI_LOCKED_TABLE_CREATE_LOCKEDROW(el, row) {
+    function UI_LOCKED_TABLE_CREATE_LOCKEDROW(table, el, row) {
         $bind(el, row);
         row._eFill = el.lastChild;
+
+        return row;
     }
 
     /**
@@ -161,15 +174,14 @@ _eFill       - 用于控制中部宽度的单元格
             el = lockedBody.firstChild,
             o;
 
-        for (; cols[i]; ) {
+        for (; cols[i];) {
             if (i == table._nLeft) {
                 el = baseBody.firstChild;
             }
             if (o = list[i++]) {
                 if (el != o) {
                     (i <= table._nLeft || i > table._nRight ? lockedBody : baseBody).insertBefore(o, el);
-                }
-                else {
+                } else {
                     el = el.nextSibling;
                 }
             }
@@ -186,10 +198,10 @@ _eFill       - 用于控制中部宽度的单元格
      * @param {ecui.ui.LockedTable} table 锁定式表格控件
      */
     function UI_LOCKED_TABLE_ALL_SPLIT(table) {
-        for (var i = 0, o; o = table._aHeadRows[i++]; ) {
+        for (var i = 0, o; o = table._aLockedHeadRow[i++];) {
             UI_LOCKED_TABLE_ROW_SPLIT(o);
         }
-        for (var i = 0, o; o = table._aRows[i++]; ) {
+        for (var i = 0, o; o = table._aLockedRow[i++];) {
             UI_LOCKED_TABLE_ROW_SPLIT(o);
         }
     }
@@ -197,7 +209,7 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_ROW_CLASS.$dispose = function () {
+    UI_LOCKED_TABLE_ROW_CLASS.$dispose = function() {
         this._eFill = null;
         UI_TABLE_ROW_CLASS.$dispose.call(this);
     };
@@ -205,7 +217,7 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.$cache = function (style, cacheSize) {
+    UI_LOCKED_TABLE_CLASS.$cache = function(style, cacheSize) {
         UI_TABLE_CLASS.$cache.call(this, style, cacheSize);
 
         var i = 0,
@@ -216,21 +228,28 @@ _eFill       - 用于控制中部宽度的单元格
         this.$$paddingTop = MAX(this.$$paddingTop, this._uLockedHead.getBody().offsetHeight);
         this.$$mainWidth -=
             (this.$$paddingLeft = pos) +
-                (this.$$paddingRight =
-                    this._nRight < cols.length ? this.$$mainWidth - cols[this._nRight].$$pos : 0);
+            (this.$$paddingRight =
+            this._nRight < cols.length ? this.$$mainWidth - cols[this._nRight].$$pos : 0);
 
         // 以下使用 style 代替临时变量 o
-        for (; style = cols[i++]; ) {
+        for (; style = cols[i++];) {
             style.$$pos -= pos;
         }
 
-        for (i = 0, pos = 0; style = rows[i++]; ) {
+        for (i = 0, pos = 0; style = rows[i++];) {
             style.getCell(this._nLeft).cache(false, true);
             style.$$pos = pos;
-            pos += MAX(style.getHeight(), style._eFill.offsetHeight);
+            if (style._eFill) {
+                pos += MAX(style.getHeight(), style._eFill.offsetHeight);
+            }
         }
 
-        this.$$mainHeight = pos;
+        if (pos) {
+            this.$$mainHeight = pos;
+            if (!this._bCreated) {
+                this.$$mainHeight += this.$$paddingTop;
+            }
+        }
 
         this._uLockedHead.cache(false, true);
         this._uLockedMain.cache(false, true);
@@ -239,7 +258,7 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.$pagescroll = function () {
+    UI_LOCKED_TABLE_CLASS.$pagescroll = function() {
         UI_TABLE_CLASS.$pagescroll.call(this);
         if (!this._uVScrollbar) {
             this._uLockedHead.getOuter().style.top = this._uHead.getOuter().style.top
@@ -249,17 +268,36 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.$resize = function () {
+    UI_LOCKED_TABLE_CLASS.$resize = function() {
         var o = this.getMain().style;
         o.paddingLeft = o.paddingRight = '';
         this.$$paddingLeft = this.$$paddingRight = 0;
+
+        var rows = this._aLockedHeadRow.concat(this._aLockedRow),
+            cIndex = this._nLeft ? this._nLeft : 0;
+
+        for (var i = 0; o = rows[i++];) {
+            var style = o.getCell(cIndex);
+            while (!style ||
+                (getAttribute(style.getOuter(), 'rowSpan') != '1' && getAttribute(style.getOuter(), 'rowSpan')) ||
+                !style.isShow()) {
+                style = o.getCell(++cIndex);
+                if (cIndex >= this.getColumnCount() - 1) {
+                    cIndex--;
+                    break;
+                }
+            }
+            o._eFill.style.height = '';
+            o.getCell(cIndex).getOuter().style.height = '';
+        }
+
         UI_TABLE_CLASS.$resize.call(this);
     };
 
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.$scroll = function () {
+    UI_LOCKED_TABLE_CLASS.$scroll = function() {
         UI_TABLE_CLASS.$scroll.call(this);
         this._uLockedMain.getBody().style.top = this.getBody().style.top;
     };
@@ -267,49 +305,85 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.$setSize = function (width, height) {
+    UI_LOCKED_TABLE_CLASS.$setSize = function(width, height) {
         var o = this.getMain().style,
             i = 0,
             layout = getParent(this.getBody()),
             lockedHead = this._uLockedHead,
+            lockedMain = this._uLockedMain,
             style = getParent(getParent(lockedHead.getBody())).style;
 
         o.paddingLeft = this.$$paddingLeft + 'px';
         o.paddingRight = this.$$paddingRight + 'px';
 
         UI_TABLE_CLASS.$setSize.call(this, width, height);
-
         o = this._uHead.getWidth() + this.$$paddingLeft + this.$$paddingRight;
-        lockedHead.$setSize(0, this.$$paddingTop);
+        lockedHead.$setSize(o, this.$$paddingTop);
+
         style.height = this.$$paddingTop + 'px';
-        this._uLockedMain.$setSize(o, this.getBodyHeight());
+        //this._uLockedMain.$setSize(o, this.getBodyHeight());
+        this._uLockedMain.$setSize(o, toNumber(layout.style.height));
         style.width = this._uLockedMain.getBody().lastChild.style.width = o + 'px';
+        this._uLockedMain.getOuter().style.top = this.$$paddingTop + 'px';
 
         width = layout.style.width;
 
+        /*
         style = layout.previousSibling.style;
         style.width = toNumber(width) + this.$$paddingLeft + this.$$paddingRight + 'px';
         style.height = toNumber(layout.style.height) + this.$$paddingTop + 'px';
+        */
 
-        var rows = this._aHeadRows.concat(this._aRows);
-        for (; o = rows[i++]; ) {
+        var rows = this._aLockedHeadRow.concat(this._aLockedRow),
+            cIndex = this._nLeft ? this._nLeft : 0;
+        for (; o = rows[i++];) {
             o._eFill.style.width = width;
 
-            style = MAX(o.getHeight(), o._eFill.offsetHeight);
-            o._eFill.style.height = style + 'px';
-            o.getCell(this._nLeft).$setSize(0, style);
+            //console.log(o._eFill.offsetHeight);
+            //style = MAX(o.getHeight(), o._eFill.offsetHeight);
+            //style = o.getCell(cIndex).getBody().offsetHeight + o.getCell(cIndex).$getBasicHeight();
+
+            style = o.getCell(cIndex);
+            while (!style ||
+                (getAttribute(style.getOuter(), 'rowSpan') != '1' && getAttribute(style.getOuter(), 'rowSpan')) ||
+                !style.isShow()) {
+                style = o.getCell(++cIndex);
+                if (cIndex >= this.getColumnCount()) {
+                    break;
+                }
+            }
+            if (cIndex < this.getColumnCount()) {
+                //保证锁定表格与普通表格的行高度一致
+                //根据当前行单元格的最大高度设置锁定和普通表格的行高度
+                style = MAX(height = o.getCell(cIndex).getOuter().offsetHeight, o._eFill.offsetHeight);
+                if (style > o._eFill.offsetHeight) {
+                    o._eFill.style.height = style + 'px';
+                } else if (height < style) {
+                    o.getCell(cIndex).getOuter().style.height = style + 'px';
+                }
+            } else {
+                //o._eFill.style.display = 'none';
+                o._eFill.style.height = '0px';
+            }
+
+            /*
+            if (this._nLeft) {
+            o.getCell(0).cache();
+            o.getCell(0).$setSize(0, style);
+            }
+            */
         }
     };
 
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.addColumn = function (options, index) {
+    UI_LOCKED_TABLE_CLASS.addColumn = function(options, index) {
         if (index >= 0) {
             if (index < this._nLeft) {
                 this._nLeft++;
             }
-            if (index < this._nRight) {
+            if (index <= this._nRight) {
                 this._nRight++;
             }
         }
@@ -319,24 +393,48 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.addRow = function (data, index) {
-        this.repaint = blank;
+    UI_LOCKED_TABLE_CLASS.removeRow = function(index) {
+        var i = 0,
+            row = this._aRows[index],
+            o,
+            lockedTR = row._eFill.parentNode;
+
+        if (row) {
+            row.hide();
+            o = row.getOuter();
+            disposeControl(row);
+            removeDom(o, true);
+            removeDom(lockedTR, true);
+            this._aRows.splice(index, 1);
+            this._aLockedRow.splice(index, 1);
+            this.repaint();
+        }
+    };
+
+    /**
+     * @override
+     */
+    UI_LOCKED_TABLE_CLASS.addRow = function(data, index) {
+        //this.repaint = blank;
 
         //__gzip_original__lockedRow
         var row = UI_TABLE_CLASS.addRow.call(this, data, index),
             index = indexOf(this.getRows(), row),
-            lockedRow = this._aRows[index],
+            lockedRow = this._aLockedRow[index],
             el = row.getMain(),
             o = createDom();
 
         o.innerHTML = '<table cellspacing="0"><tbody><tr class="' + el.className + '" style="' + el.style.cssText +
             '"><td style="padding:0px;border:0px"></td></tr></tbody></table>';
 
-        UI_LOCKED_TABLE_CREATE_LOCKEDROW(el = o.lastChild.lastChild.lastChild, row);
-        this._uLockedMain.getBody().lastChild.lastChild.insertBefore(el, lockedRow && lockedRow.getOuter());
-        UI_LOCKED_TABLE_ROW_SPLIT(row);
+        o = UI_LOCKED_TABLE_CREATE_LOCKEDROW(this, el = o.lastChild.lastChild.lastChild, row);
+        //this._uLockedMain.getBody().lastChild.lastChild.insertBefore(el, lockedRow && lockedRow.getOuter());
+        lockedRow = lockedRow ? lockedRow._eFill.parentNode : null;
+        this._uLockedMain.getBody().lastChild.lastChild.insertBefore(el, lockedRow);
+        this._aLockedRow.splice(index, 0, o);
+        UI_LOCKED_TABLE_ROW_SPLIT(o);
 
-        delete this.repaint;
+        //delete this.repaint;
         this.repaint();
 
         return row;
@@ -345,7 +443,7 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.init = function () {
+    UI_LOCKED_TABLE_CLASS.init = function() {
         UI_TABLE_CLASS.init.call(this);
         UI_LOCKED_TABLE_ALL_SPLIT(this);
     };
@@ -353,7 +451,7 @@ _eFill       - 用于控制中部宽度的单元格
     /**
      * @override
      */
-    UI_LOCKED_TABLE_CLASS.removeColumn = function (index) {
+    UI_LOCKED_TABLE_CLASS.removeColumn = function(index) {
         UI_TABLE_CLASS.removeColumn.call(this, index);
         if (index >= 0) {
             if (index < this._nLeft) {
@@ -370,19 +468,19 @@ _eFill       - 用于控制中部宽度的单元格
      * 行控件鼠标事件发生时，需要通知关联的行控件也同步产生默认的处理。
      * @protected
      */
-    (function () {
+    (function() {
         function build(name) {
-            UI_LOCKED_TABLE_ROW_CLASS[name] = function (event) {
+            UI_LOCKED_TABLE_ROW_CLASS[name] = function(event) {
                 UI_CONTROL_CLASS[name].call(this, event);
                 getParent(this._eFill).className = this.getMain().className;
             };
         }
 
-        for (var i = 0; i < 11; ) {
+        for (var i = 0; i < 11;) {
             build('$' + eventNames[i++]);
         }
     })();
-//{/if}//
-//{if 0}//
+    //{/if}//
+    //{if 0}//
+    //{/if}//
 })();
-//{/if}//

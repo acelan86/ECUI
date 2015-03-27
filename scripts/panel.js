@@ -53,6 +53,7 @@ $$mainHeight         - layout区域的实际高度
 
         UI_CONTROL = ui.Control,
         UI_CONTROL_CLASS = UI_CONTROL.prototype,
+        UI_SCROLLBAR_CLASS = ui.Scrollbar.prototype,
         UI_VSCROLLBAR = ui.VScrollbar,
         UI_HSCROLLBAR = ui.HScrollbar;
 //{/if}//
@@ -110,7 +111,7 @@ $$mainHeight         - layout区域的实际高度
      *
      * @param {number} value 控件的当前值
      */
-    UI_BROWSER_SCROLLBAR_CLASS.$setValue = function (value) {
+    UI_BROWSER_SCROLLBAR_CLASS.$setValue = UI_BROWSER_SCROLLBAR_CLASS.setValue = function (value) {
         this.getMain()[this._aProperty[1]] = MIN(MAX(0, value), this.getTotal());
     };
 
@@ -173,17 +174,6 @@ $$mainHeight         - layout区域的实际高度
      */
     UI_BROWSER_SCROLLBAR_CLASS.setTotal = function (value) {
         this.getMain().lastChild.style[this._aProperty[2]] = value + 'px';
-    };
-
-    /**
-     * 设置滚动条控件的当前值。
-     * @public
-     *
-     * @param {number} value 控件的当前值
-     */
-    UI_BROWSER_SCROLLBAR_CLASS.setValue = function (value) {
-        this.$setValue(value);
-        triggerEvent(this.getParent(), 'scroll');
     };
 
     UI_BROWSER_SCROLLBAR_CLASS.$cache =
@@ -438,20 +428,18 @@ $$mainHeight         - layout区域的实际高度
         UI_CONTROL_CLASS.$setSize.call(this, width, height);
         this.$locate();
 
-        var basicWidth = this.$getBasicWidth(),
-            basicHeight = this.$getBasicHeight(),
-            paddingWidth = this.$$paddingLeft + this.$$paddingRight,
+        var paddingWidth = this.$$paddingLeft + this.$$paddingRight,
             paddingHeight = this.$$paddingTop + this.$$paddingBottom,
-            bodyWidth = this.getWidth() - basicWidth,
-            bodyHeight = this.getHeight() - basicHeight,
+            bodyWidth = this.getWidth() - this.$getBasicWidth(),
+            bodyHeight = this.getHeight() - this.$getBasicHeight(),
             mainWidth = this.$$mainWidth,
             mainHeight = this.$$mainHeight,
             browser = this._eBrowser,
             vscroll = this._uVScrollbar,
             hscroll = this._uHScrollbar,
             corner = this._uCorner,
-            vsWidth = vscroll ? vscroll.getWidth() : 0,
-            hsHeight = hscroll ? hscroll.getHeight() : 0, 
+            vsWidth = vscroll ? vscroll.getWidth():0,
+            hsHeight = hscroll ? hscroll.getHeight():0,
             innerWidth = bodyWidth - vsWidth,
             innerHeight = bodyHeight - hsHeight,
             hsWidth = innerWidth + paddingWidth,
@@ -488,10 +476,10 @@ $$mainHeight         - layout区域的实际高度
                     // 宽度与高度都超出了显示滚动条后余下的宽度与高度，垂直与水平滚动条同时显示
                     if (mainWidth > innerWidth && mainHeight > innerHeight) {
                         hscroll.$setSize(hsWidth);
-                        hscroll.setTotal(browser ? mainWidth + basicWidth : mainWidth - innerWidth);
+                        hscroll.setTotal(mainWidth - (browser ? 0 : innerWidth));
                         hscroll.$show();
                         vscroll.$setSize(0, vsHeight);
-                        vscroll.setTotal(browser ? mainHeight + basicHeight : mainHeight - innerHeight);
+                        vscroll.setTotal(mainHeight - (browser ? 0 : innerHeight));
                         vscroll.$show();
                         corner.$setSize(vsWidth, hsHeight);
                         corner.$show();
@@ -503,7 +491,7 @@ $$mainHeight         - layout区域的实际高度
                     if (mainWidth > bodyWidth) {
                         // 宽度超出控件的宽度，高度没有超出显示水平滚动条后余下的高度，只显示水平滚动条
                         hscroll.$setSize(bodyWidth + paddingWidth);
-                        hscroll.setTotal(browser ? mainWidth + basicWidth : mainWidth - innerWidth);
+                        hscroll.setTotal(mainWidth - (browser ? 0 : bodyWidth));
                         hscroll.$show();
                         if (vscroll) {
                             vscroll.$hide();
@@ -518,7 +506,7 @@ $$mainHeight         - layout区域的实际高度
                     if (mainHeight > bodyHeight) {
                         // 高度超出控件的高度，宽度没有超出显示水平滚动条后余下的宽度，只显示水平滚动条
                         vscroll.$setSize(0, bodyHeight + paddingHeight);
-                        vscroll.setTotal(browser ? mainHeight + basicHeight : mainHeight - bodyHeight);
+                        vscroll.setTotal(mainHeight - (browser ? 0 : bodyHeight));
                         vscroll.$show();
                         if (hscroll) {
                             hscroll.$hide();
@@ -594,21 +582,16 @@ $$mainHeight         - layout区域的实际高度
             this._uCorner.init();
         }
     };
-
-    /**
-     * 控件显示区域复位。
-     * reset 方法设置水平滚动条或者垂直滚动条的当前值为 0。
-     * @public
-     */
-    UI_PANEL_CLASS.reset = function () {
+    UI_PANEL_CLASS.resetScroll = function () {
+        var fuc = this._eBrowser ? UI_BROWSER_SCROLLBAR_CLASS : UI_SCROLLBAR_CLASS;
         if (this._uVScrollbar) {
-            this._uVScrollbar.setValue(0);
+            fuc.setValue.call(this._uVScrollbar, 0);
         }
         if (this._uHScrollbar) {
-            this._uHScrollbar.setValue(0);
+            fuc.setValue.call(this._uHScrollbar, 0);
         }
-    };
+    }
 //{/if}//
 //{if 0}//
 })();
-//{/if}//
+

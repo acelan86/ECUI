@@ -16,7 +16,7 @@ _uTitle     - 标题栏
 _uClose     - 关闭按钮
 */
 //{if 0}//
-(function () {
+(function() {
 
     var core = ecui,
         array = core.array,
@@ -27,7 +27,6 @@ _uClose     - 关闭按钮
         undefined,
 
         indexOf = array.indexOf,
-        children = dom.children,
         createDom = dom.create,
         first = dom.first,
         getStyle = dom.getStyle,
@@ -46,91 +45,93 @@ _uClose     - 关闭按钮
         UI_CONTROL = ui.Control,
         UI_CONTROL_CLASS = ui.Control.prototype,
         UI_BUTTON = ui.Button;
-//{/if}//
-//{if $phase == "define"}//
+    //{/if}//
+    //{if $phase == "define"}//
     ///__gzip_original__UI_FORM
     ///__gzip_original__UI_FORM_CLASS
     /**
-     * 初始化窗体控件。
-     * options 对象支持的属性如下：
-     * hide         初始是否自动隐藏
-     * titleAuto    title 是否自适应宽度，默认自适应宽度
-     * @public
-     *
-     * @param {Object} options 初始化选项
-     */
+    * 初始化窗体控件。
+    * options 对象支持的属性如下：
+    * hide 初始是否自动隐藏
+    * titleAuto title 是否自适应宽度，默认自适应宽度
+    * @public
+    *
+    * @param {Object} options 初始化选项
+    */
     var UI_FORM = ui.Form =
         inheritsControl(
             UI_CONTROL,
             'ui-form',
-            function (el, options) {
+            function(el, options) {
                 // 生成标题控件与内容区域控件对应的Element对象
                 var type = this.getType(),
-                    o = createDom(type + '-body', 'position:relative;overflow:auto'),
+                    o = createDom(type + '-body'),
+                    foot = createDom(type + '-foot'),
                     titleEl = first(el);
-
                 moveElements(el, o, true);
 
                 if (titleEl && titleEl.tagName == 'LABEL') {
                     el.innerHTML =
-                        '<div class="' + type + '-close' + this.Close.TYPES + '" style="position:absolute"></div>';
+                        '<div class="' + type + '-close ui-button-small' + this.Close.TYPES + '" style="position:absolute;"></div>';
                     el.insertBefore(titleEl, el.firstChild);
                     titleEl.className = type + '-title' + this.Title.TYPES;
-                    titleEl.style.position = 'absolute';
                 }
                 else {
-                    el.innerHTML =
-                        '<label class="' + type + '-title' + this.Title.TYPES +
-                            '" style="position:absolute"></label><div class="' + type + '-close' + this.Close.TYPES +
-                            '" style="position:absolute"></div>';
+                    el.innerHTML = '<div class="bugie6"><label class="' + type + '-title' + this.Title.TYPES + '"></label></div><div class="' + type + '-close ui-button-small' + this.Close.TYPES + '" style="position:absolute"></div>';
                     titleEl = el.firstChild;
                 }
 
-                el.style.overflow = 'hidden';
                 el.appendChild(o);
-            },
-            function (el, options) {
-                var elements = children(el);
+                el.appendChild(foot);
+                this.$setBody(o);
 
-                this._bFlag = options.hide;
+                this._eFoot = foot;
+                this._eContent = o;
+
+                this._bFlag = options.hideForm;
+                this._bAutoCenter = options.autoCenter;
                 this._bAuto = options.titleAuto !== false;
+                if (options.heightAuto == undefined) {
+                    this._bHeightAuto = true;
+                } else {
+                    this._bHeightAuto = options.heightAuto;
+                }
+                //this._bHideClosed = options.hideClosed;
 
                 // 初始化标题区域
-                this._uTitle = $fastCreate(this.Title, elements[0], this, {userSelect: false});
+                this._uTitle = $fastCreate(this.Title, titleEl, this, { userSelect: false });
 
                 // 初始化关闭按钮
-                this._uClose = $fastCreate(this.Close, elements[1], this);
-
-                this.$setBody(elements[2]);
+                this._uClose = $fastCreate(this.Close, titleEl.nextSibling, this);
             }
         ),
         UI_FORM_CLASS = UI_FORM.prototype,
 
-        /**
-         * 初始化窗体控件的标题栏部件。
-         * @public
-         *
-         * @param {Object} options 初始化选项
-         */
+    /**
+    * 初始化窗体控件的标题栏部件。
+    * @public
+    *
+    * @param {Object} options 初始化选项
+    */
         UI_FORM_TITLE_CLASS = (UI_FORM_CLASS.Title = inheritsControl(UI_CONTROL)).prototype,
 
-        /**
-         * 初始化窗体控件的关闭按钮部件。
-         * @public
-         *
-         * @param {Object} options 初始化选项
-         */
+    /**
+    * 初始化窗体控件的关闭按钮部件。
+    * @public
+    *
+    * @param {Object} options 初始化选项
+    */
         UI_FORM_CLOSE_CLASS = (UI_FORM_CLASS.Close = inheritsControl(UI_BUTTON)).prototype,
 
-        UI_FORM_ALL = [],   // 当前显示的全部窗体
+        UI_FORM_ALL = ecui.UI_FORM_ALL = [],   // 当前显示的全部窗体
         UI_FORM_MODAL = 0;  // 当前showModal的窗体数
-//{else}//
+    //{else}//
     /**
-     * 刷新所有显示的窗体的zIndex属性。
-     * @protected
-     *
-     * @param {ecui.ui.Form} form 置顶显示的窗体
-     */
+    * 刷新所有显示的窗体的zIndex属性。
+    * @protected
+    *
+    * @param {ecui.ui.Form} form 置顶显示的窗体
+    */
     function UI_FORM_FLUSH_ZINDEX(form) {
         UI_FORM_ALL.push(UI_FORM_ALL.splice(indexOf(UI_FORM_ALL, form), 1)[0]);
 
@@ -141,27 +142,27 @@ _uClose     - 关闭按钮
     }
 
     /**
-     * 标题栏激活时触发拖动，如果当前窗体未得到焦点则得到焦点。
-     * @override
-     */
-    UI_FORM_TITLE_CLASS.$activate = function (event) {
+    * 标题栏激活时触发拖动，如果当前窗体未得到焦点则得到焦点。
+    * @override
+    */
+    UI_FORM_TITLE_CLASS.$activate = function(event) {
         UI_CONTROL_CLASS.$activate.call(this, event);
         drag(this.getParent(), event);
     };
 
     /**
-     * 窗体关闭按钮点击关闭窗体。
-     * @override
-     */
-    UI_FORM_CLOSE_CLASS.$click = function (event) {
+    * 窗体关闭按钮点击关闭窗体。
+    * @override
+    */
+    UI_FORM_CLOSE_CLASS.$click = function(event) {
         UI_CONTROL_CLASS.$click.call(this, event);
         this.getParent().hide();
     };
 
     /**
-     * @override
-     */
-    UI_FORM_CLASS.$cache = function (style, cacheSize) {
+    * @override
+    */
+    UI_FORM_CLASS.$cache = function(style, cacheSize) {
         UI_CONTROL_CLASS.$cache.call(this, style, cacheSize);
 
         style = getStyle(this.getMain().lastChild);
@@ -172,11 +173,12 @@ _uClose     - 关闭按钮
     };
 
     /**
-     * 销毁窗体时需要先关闭窗体，并不再保留窗体的索引。
-     * @override
-     */
-    UI_FORM_CLASS.$dispose = function () {
-        if (indexOf(UI_FORM_ALL, this) >= 0) {
+    * 销毁窗体时需要先关闭窗体，并不再保留窗体的索引。
+    * @override
+    */
+    UI_FORM_CLASS.$dispose = function() {
+        var i;
+        if ((i = indexOf(UI_FORM_ALL, this)) >= 0) {
             // 窗口处于显示状态，需要强制关闭
             this.$hide();
         }
@@ -184,72 +186,80 @@ _uClose     - 关闭按钮
     };
 
     /**
-     * 窗体控件获得焦点时需要将自己置于所有窗体控件的顶部。
-     * @override
-     */
-    UI_FORM_CLASS.$focus = function () {
+    * 窗体控件获得焦点时需要将自己置于所有窗体控件的顶部。
+    * @override
+    */
+    UI_FORM_CLASS.$focus = function() {
         UI_CONTROL_CLASS.$focus.call(this);
         UI_FORM_FLUSH_ZINDEX(this);
     };
 
     /**
-     * 窗体隐藏时将失去焦点状态，如果窗体是以 showModal 方式打开的，隐藏窗体时，需要恢复页面的状态。
-     * @override
-     */
-    UI_FORM_CLASS.$hide = function () {
+    * 窗体隐藏时将失去焦点状态，如果窗体是以 showModal 方式打开的，隐藏窗体时，需要恢复页面的状态。
+    * @override
+    */
+    UI_FORM_CLASS.$hide = function() {
         // showModal模式下隐藏窗体需要释放遮罩层
         var i = indexOf(UI_FORM_ALL, this);
-        UI_FORM_ALL.splice(i, 1);
+        //by acelan indexof找到的情况是>=0;
+        if (i >= 0) {
+            UI_FORM_ALL.splice(i, 1);
 
-        if (i > UI_FORM_ALL.length - UI_FORM_MODAL) {
-            if (this._bFlag) {
-                if (i == UI_FORM_ALL.length) {
-                    mask();
+            if (i > UI_FORM_ALL.length - UI_FORM_MODAL) {
+                if (this._bFlag) {
+                    if (i == UI_FORM_ALL.length) {
+                        mask();
+                    }
+                    else {
+                        // 如果不是最后一个，将遮罩层标记后移
+                        UI_FORM_ALL[i]._bFlag = true;
+                    }
+                    this._bFlag = false;
                 }
-                else {
-                    // 如果不是最后一个，将遮罩层标记后移
-                    UI_FORM_ALL[i]._bFlag = true;
-                }
-                this._bFlag = false;
+                UI_FORM_MODAL--;
             }
-            UI_FORM_MODAL--;
+            loseFocus(this);
         }
 
         UI_CONTROL_CLASS.$hide.call(this);
-        loseFocus(this);
     };
 
     /**
-     * @override
-     */
-    UI_FORM_CLASS.$setSize = function (width, height) {
+    * @override
+    */
+    UI_FORM_CLASS.$setSize = function(width, height) {
+        if (this._bHeightAuto) {
+            height = null;
+        }
         UI_CONTROL_CLASS.$setSize.call(this, width, height);
         this.$locate();
 
         var style = this.getMain().lastChild.style;
 
         style.width = this.getBodyWidth() + 'px';
-        style.height = this.getBodyHeight() + 'px';
+        if (!this._bHeightAuto) {
+            style.height = this.getBodyHeight() + 'px';
+        }
         if (this._bAuto) {
             this._uTitle.$setSize(this.getBodyWidth());
         }
     };
 
     /**
-     * 窗体显示时将获得焦点状态。
-     * @override
-     */
-    UI_FORM_CLASS.$show = function () {
+    * 窗体显示时将获得焦点状态。
+    * @override
+    */
+    UI_FORM_CLASS.$show = function() {
         UI_FORM_ALL.push(this);
         UI_CONTROL_CLASS.$show.call(this);
         setFocused(this);
     };
 
     /**
-     * 窗体居中显示。
-     * @public
-     */
-    UI_FORM_CLASS.center = function () {
+    * 窗体居中显示。
+    * @public
+    */
+    UI_FORM_CLASS.center = function() {
         o = this.getOuter();
         o.style.position = this.$$position = 'absolute';
         o = o.offsetParent;
@@ -264,14 +274,18 @@ _uClose     - 关闭按钮
             y = o.offsetHeight;
         }
 
-        this.setPosition((x - this.getWidth()) / 2, (y - this.getHeight()) / 2);
+        x = (x - this.getWidth()) / 2;
+        y = 100 + T.page.getScrollTop() || 0;
+        //y = (y - this.getHeight()) / 2;
+
+        this.setPosition(x > 0 ? x : 0, y > 0 ? y : 0);
     };
 
     /**
-     * 如果窗体是以 showModal 方式打开的，只有位于最顶层的窗体才允许关闭。
-     * @override
-     */
-    UI_FORM_CLASS.hide = function () {
+    * 如果窗体是以 showModal 方式打开的，只有位于最顶层的窗体才允许关闭。
+    * @override
+    */
+    UI_FORM_CLASS.hide = function() {
         for (var i = indexOf(UI_FORM_ALL, this), o; o = UI_FORM_ALL[++i]; ) {
             if (o._bFlag) {
                 return false;
@@ -281,9 +295,9 @@ _uClose     - 关闭按钮
     };
 
     /**
-     * @override
-     */
-    UI_FORM_CLASS.init = function () {
+    * @override
+    */
+    UI_FORM_CLASS.init = function() {
         UI_CONTROL_CLASS.init.call(this);
         this._uTitle.init();
         this._uClose.init();
@@ -294,25 +308,33 @@ _uClose     - 关闭按钮
         else {
             this.$show();
         }
+        // if (this._bHideClosed) {
+        //     this._uClose.$hide();
+        // }
     };
 
     /**
-     * 设置窗体控件标题。
-     * @public
-     *
-     * @param {string} text 窗体标题
-     */
-    UI_FORM_CLASS.setTitle = function (text) {
+    * 设置窗体控件标题。
+    * @public
+    *
+    * @param {string} text 窗体标题
+    */
+    UI_FORM_CLASS.setTitle = function(text) {
         this._uTitle.setContent(text || '');
     };
 
     /**
-     * @override
-     */
-    UI_FORM_CLASS.show = function () {
+    * @override
+    */
+    UI_FORM_CLASS.show = function() {
         if (UI_FORM_MODAL && indexOf(UI_FORM_ALL, this) < UI_FORM_ALL.length - UI_FORM_MODAL) {
             // 如果已经使用showModal，对原来不是showModal的窗体进行处理
             UI_FORM_MODAL++;
+        }
+
+        //center by acelan
+        if (this._bAutoCenter) {
+            this.center();
         }
 
         var result = UI_CONTROL_CLASS.show.call(this);
@@ -323,19 +345,23 @@ _uClose     - 关闭按钮
     };
 
     /**
-     * 窗体以独占方式显示
-     * showModal 方法将窗体控件以独占方式显示，此时鼠标点击窗体以外的内容无效，关闭窗体后自动恢复。
-     * @public
-     *
-     * @param {number} opacity 遮罩层透明度，默认为0.05
-     */
-    UI_FORM_CLASS.showModal = function (opacity) {
+    * 窗体以独占方式显示
+    * showModal 方法将窗体控件以独占方式显示，此时鼠标点击窗体以外的内容无效，关闭窗体后自动恢复。
+    * @public
+    *
+    * @param {number} opacity 遮罩层透明度，默认为0.5
+    */
+    UI_FORM_CLASS.showModal = function(opacity) {
         if (!this._bFlag) {
             if (indexOf(UI_FORM_ALL, this) < UI_FORM_ALL.length - UI_FORM_MODAL) {
                 UI_FORM_MODAL++;
             }
+            // center  by acelan
+            if (this._bAutoCenter) {
+                this.center();
+            }
 
-            mask(opacity !== undefined ? opacity : 0.05, 32766 + UI_FORM_MODAL * 2);
+            mask(opacity !== undefined ? opacity : 0.5, 32766 + UI_FORM_MODAL * 2);
 
             this._bFlag = true;
             if (!UI_CONTROL_CLASS.show.call(this)) {
@@ -343,7 +369,29 @@ _uClose     - 关闭按钮
             }
         }
     };
-//{/if}//
-//{if 0}//
+
+    /**
+    * override
+    * 自适应高度时getHeight需要实时计算
+    */
+    UI_FORM_CLASS.getHeight = function() {
+        if (this._bHeightAuto) {
+            this.cache(true, true);
+        }
+        return UI_CONTROL_CLASS.getHeight.call(this);
+    };
+
+    /**
+    * override
+    * 获取真正的content区域
+    * by acelan
+    */
+    UI_FORM_CLASS.getContent = function() {
+        return this._eContent;
+    };
+    UI_FORM_CLASS.getFoot = function() {
+        return this._eFoot;
+    };
+    //{/if}//
+    //{if 0}//
 })();
-//{/if}//

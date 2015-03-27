@@ -1,7 +1,6 @@
 /*
 InputControl - 定义输入数据的基本操作。
 输入控件，继承自基础控件，实现了对原生 InputElement 的功能扩展，包括光标的控制、输入事件的实时响应(每次改变均触发事件)，以及 IE 下不能动态改变输入框的表单项名称的模拟处理。
-** 在IE6下原生Input会有上下3px的间距，只能通过设置父元素的overflow:hidden解决，本控件未对这种情况进行特殊设置，请注意 **
 
 输入控件直接HTML初始化的例子:
 <input ecui="type:input-control" type="password" name="passwd" value="1111">
@@ -15,6 +14,9 @@ InputControl - 定义输入数据的基本操作。
 属性
 _bHidden - 输入框是否隐藏
 _eInput  - INPUT对象
+
+需求： by acelan
+placeholder属性需要
 */
 //{if 0}//
 (function () {
@@ -43,6 +45,7 @@ _eInput  - INPUT对象
         timer = util.timer,
 
         $bind = core.$bind,
+        getFocused = core.getFocused,
         inheritsControl = core.inherits,
         triggerEvent = core.triggerEvent,
         wrapEvent = core.wrapEvent,
@@ -88,6 +91,7 @@ _eInput  - INPUT对象
                     }
                 }
 
+                el.style.overflow = 'hidden';
                 setStyle(el, 'display', 'inline-block');
 
                 input.style.border = '0px';
@@ -177,10 +181,10 @@ _eInput  - INPUT对象
         event = wrapEvent(event).target.getControl();
 
         // 设置默认失去焦点事件，阻止在blur/focus事件中再次回调
-        event['$' + type] = UI_CONTROL_CLASS['$' + type];
+        if (type == 'blur' && event != getFocused()) {
+            return;
+        }
         event[type]();
-
-        delete event['$' + type];
     };
 
     /**
@@ -403,7 +407,6 @@ _eInput  - INPUT对象
             this._eInput = el;
         }
     };
-
     /**
      * 设置控件的值。
      * setValue 方法设置提交时表单项的值，使用 getValue 方法获取设置的值。
@@ -450,4 +453,6 @@ _eInput  - INPUT对象
 //{/if}//
 //{if 0}//
 })();
-//{/if}//
+
+
+

@@ -1,3 +1,5 @@
+
+
 /*
 Radio - 定义一组选项中选择唯一选项的基本操作。
 单选框控件，继承自输入框控件，实现了对原生 InputElement 单选框的功能扩展，支持对选中的图案的选择。单选框控件适用所有在一组中只允许选择一个目标的交互，并不局限于此分组的表现形式(文本、图片等)。
@@ -13,17 +15,20 @@ Radio - 定义一组选项中选择唯一选项的基本操作。
 
 属性
 _bDefault  - 默认的选中状态
+
+
+bug : by acelan
+<label><input type="radio" name="testradio" ecui="type:radio;" />label test</label>
+这种写法的情况下，点击label浏览器默认会触发input radio变成check状态但是界面上没有展现checked状态，下次再点击的时候getChecked() == true, 后续无法执行
+
 */
 //{if 0}//
 (function () {
 
     var core = ecui,
         ui = core.ui,
-        util = core.util,
 
         undefined,
-
-        setDefault = util.setDefault,
 
         getKey = core.getKey,
         inheritsControl = core.inherits,
@@ -47,8 +52,8 @@ _bDefault  - 默认的选中状态
             UI_INPUT_CONTROL,
             'ui-radio',
             function (el, options) {
-                setDefault(options, 'hidden', true);
-                setDefault(options, 'inputType', 'radio');
+                options.hidden = true;
+                options.inputType = 'radio';
             },
             function (el, options) {
                 // 保存节点选中状态，用于修复IE6/7下移动DOM节点时选中状态发生改变的问题
@@ -109,6 +114,28 @@ _bDefault  - 默认的选中状态
         // 修复IE6/7下移动DOM节点时选中状态发生改变的问题
         this.getInput().checked = this._bDefault;
         UI_INPUT_CONTROL_CLASS.$reset.call(this, event);
+    };
+
+
+    /**
+     * 选中全局中name = name 的checkbox
+     * @param  {[type]} name [description]
+     * @return {[type]}      [description]
+     */
+    UI_RADIO.getItems = function (name) {
+        return query({type: UI_RADIO, custom: function (control) {
+            return control.getName() == name;
+        }});
+    };
+    UI_RADIO.setValue = function (name, value) {
+        query({
+            type: UI_RADIO,
+            custom: function (control) {
+                if (control.getName() == name && control.getValue() == value) {
+                    control.setChecked(true);
+                }
+            }
+        });
     };
 
     /**
@@ -177,4 +204,3 @@ _bDefault  - 默认的选中状态
 //{/if}//
 //{if 0}//
 })();
-//{/if}//

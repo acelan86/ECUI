@@ -9,10 +9,9 @@ MonthView - 定义日历显示的基本操作。
 _nYear      - 年份
 _nMonth     - 月份(0-11)
 _aCells     - 日历控件内的所有单元格，其中第0-6项是日历的头部星期名称
-_oBegin     - 起始日期 小于这个日期的日历单元格会被disabled
-_oEnd       - 结束日期 大于这个日期的日历单元格会被disabled
-_oDate      - 当前选择日期
-_uSelected  - 当前选择的日历单元格
+_oRange     - 默认的选择范围，只能通过初始化时的参数进行赋值
+_oCurRange  - 当前的选择范围，通过setRange设置，如果没有设置_oCurRange 则使用 _oRange,
+              当两者都存在时取交集，确定最小的范围
 
 子控件属性
 _nDay       - 从本月1号开始计算的天数，如果是上个月，是负数，如果是下个月，会大于当月最大的天数
@@ -24,9 +23,11 @@ _nDay       - 从本月1号开始计算的天数，如果是上个月，是负�
         array = core.array,
         dom = core.dom,
         ui = core.ui,
+        util = core.util,
 
         DATE = Date,
 
+        extend = util.extend,
         indexOf = array.indexOf,
         addClass = dom.addClass,
         getParent = dom.getParent,
@@ -58,7 +59,8 @@ _nDay       - 从本月1号开始计算的天数，如果是上个月，是负�
             function (el, options) {
                 var i = 0,
                     type = this.getType(),
-                    list = [];
+                    list = [],
+                    o;
 
                 el.style.overflow = 'auto';
 
@@ -76,18 +78,19 @@ _nDay       - 从本月1号开始计算的天数，如果是上个月，是负�
 
                 el.innerHTML =
                     '<table cellspacing="0"><thead><tr>' + list.join('') + '</tr></tbody></table>';
-            },
-            function (el, options) {
+
                 this._aCells = [];
-                for (var i = 0, list = el.getElementsByTagName('TD'), o; o = list[i]; ) {
+                list = el.getElementsByTagName('TD');
+                for (i = 0; o = list[i]; ) {
                     // 日历视图单元格禁止改变大小
                     this._aCells[i++] = $fastCreate(this.Cell, o, this, {resizable: false});
                 }
 
-                this._oBegin = new Date(options.begin);
-                this._oEnd = new Date(options.end);
+                this._oRange = options.range || {};
+                this._oCurRange = extend({}, this._oRange);
 
-                this.setView(options.year, options.month);
+                this.setDate(options.year, options.month);
+                this.setDay(options.day);
             }
         ),
         UI_MONTH_VIEW_CLASS = UI_MONTH_VIEW.prototype,
@@ -102,26 +105,22 @@ _nDay       - 从本月1号开始计算的天数，如果是上个月，是负�
 //{else}//
     UI_MONTH_VIEW.WEEKNAMES = ['一', '二', '三', '四', '五', '六', '日'];
 
-    /**
-     * 选中某个日期单元格
-     * @private
-     *
-     * @param {Object} 日期单元格对象
-     */
-    function UI_MONTH_VIEW_CLASS_SETSELECTED(control, o) {
-        if (control._uSelected == o) {
-            return;
+    function UI_MONTH_VIEW_SELECTED(con, cell) {
+        if (con._uCellSel) {
+            con._uCellSel.alterClass('-selected');
         }
-        
-        if (control._uSelected) {
-            control._uSelected.alterClass('-selected');
+        if (cell) {
+            cell.alterClass('+selected');
+            con._uCellSel = cell;
         }
+    }
 
-        if (o) {
-            o.alterClass('+selected');
-        }
-        control._uSelected = o;
-    };
+    function UI_MONTH_VIEW_COMPARE(a, b) {
+        a = new Date(a.getFullYear(), a.getMonth(), a.getDate());
+        b = new Date(b.getFullYear(), b.getMonth(), b.getDate());
+        return a >= b;
+    }
+
 
     /**
      * 点击时，根据单元格类型触发相应的事件。
@@ -129,19 +128,15 @@ _nDay       - 从本月1号开始计算的天数，如果是上个月，是负�
      */
     UI_MONTH_VIEW_CELL_CLASS.$click = function (event) {
         var parent = this.getParent(),
-            index = indexOf(parent._aCells, this),
-            curDate = parent._oDate;
+            index = indexOf(parent._aCells, this);
 
-        if (index < 7) {
-            triggerEvent(parent, 'titleclick', event, [index]);
-        }
-        else {
-            index = new DATE(parent._nYear, parent._nMonth, this._nDay);
-            //change事件可以取消，返回false会阻止选中
-            if ((!curDate || index.getTime() != curDate.getTime()) && triggerEvent(parent, 'change', event, [index])) {
-                parent._oDate = new DATE(parent._nYear, parent._nMonth, this._nDay);
-                UI_MONTH_VIEW_CLASS_SETSELECTED(parent, this);
-            }
+        if (triggerEvent(
+            parent,
+            index < 7 ? 'titleclick' : 'dateclick',
+            event,
+            index < 7 ? [index] : [new DATE(parent._nYear, parent._nMonth, this._nDay)]
+        ) !== false) {
+            UI_MONTH_VIEW_SELECTED(parent, this);
         }
     };
 
@@ -174,62 +169,39 @@ _nDay       - 从本月1号开始计算的天数，如果是上个月，是负�
      */
     UI_MONTH_VIEW_CLASS.move = function (offsetMonth) {
         var time = new DATE(this._nYear, this._nMonth + offsetMonth, 1);
-        this.setView(time.getFullYear(), time.getMonth() + 1);
+        this.setDate(time.getFullYear(), time.getMonth() + 1);
+    };
+
+    UI_MONTH_VIEW_CLASS.setDay = function (day) {
+        var list = this._aCells, i, o;
+        if (!day) {
+            UI_MONTH_VIEW_SELECTED(this);
+            return;
+        }
+        for (i = 0; o = list[i]; i++) {
+            if (!o.isDisabled() && o._nDay == day) {
+                UI_MONTH_VIEW_SELECTED(this, o);
+                break;
+            }
+        }
+    };
+
+    UI_MONTH_VIEW_CLASS.getDay = function () {
+        var res;
+        if (this._uCellSel) {
+            res = this._uCellSel._nDay;
+        }
+        return res;
     };
 
     /**
-     * 设置日历的显示范围
-     * 只有在两参数的闭区间外的日期单元格会被disabled
-     * @public
-     *
-     * @param {Date} begin 起始日期，如果为null则表示不设置起始日期
-     * @param {Date} end 结束日期，如果为null则表示不设置结束日期
-     */
-    UI_MONTH_VIEW_CLASS.setRange = function (begin, end) {
-        this._oBegin = begin;
-        this._oEnd = end;
-        this.setView(this.getYear(), this.getMonth());
-    };
-
-    /**
-     * 设置日历当前选择日期，并切换到对应的月份
-     * @public
-     *
-     * @param {Date} date 日期
-     */
-    UI_MONTH_VIEW_CLASS.setDate = function (date) {
-        this.$setDate(date);
-        this.setView(date.getFullYear(), date.getMonth() + 1);
-    };
-
-    /**
-     * 获取当前日历选择的日期
-     * @public
-     *
-     * @return {Date} 日期
-     */
-    UI_MONTH_VIEW_CLASS.getDate = function () {
-        return this._oDate;
-    };
-
-    /*
-     * 设置日历的当前选择日历
-     * @private
-     *
-     * @param {Date} date 日期
-     */
-    UI_MONTH_VIEW_CLASS.$setDate = function (date) {
-        this._oDate = date ? new DATE(date.getFullYear(), date.getMonth(), date.getDate()) : null;
-    };
-
-    /**
-     * 设置日历控件当前显示的月份。
+     * 设置日历控件当前显示的日期。
      * @public
      *
      * @param {number} year 年份(19xx-20xx)，如果省略使用浏览器的当前年份
      * @param {number} month 月份(1-12)，如果省略使用浏览器的当前月份
      */
-    UI_MONTH_VIEW_CLASS.setView = function (year, month) {
+    UI_MONTH_VIEW_CLASS.setDate = function (year, month) {
         //__gzip_original__date
         var i = 7,
             today = new DATE(),
@@ -241,47 +213,82 @@ _nDay       - 从本月1号开始计算的天数，如果是上个月，是负�
             lastDayOfLastMonth = o.getDate(),
             // 得到当前月的天数
             lastDayOfCurrMonth = new DATE(year, month + 1, 0).getDate(),
-            begin = this._oBegin, end = this._oEnd, selected = this._oDate;
+            rangeBegin = this._oCurRange.begin,
+            rangeEnd = this._oCurRange.end, currDate;
 
-        this._nYear = year;
-        this._nMonth = month;
+        if (this._nYear != year || this._nMonth != month) {
+            this._nYear = year;
+            this._nMonth = month;
 
-        //设置日期范围
-        begin = begin && begin.getFullYear() == year && begin.getMonth() == month ? begin.getDate() : 0 ;
-        end = end && end.getFullYear() == year && end.getMonth() == month ? end.getDate() : 31;
+            currDate = new DATE(year, month, 1);
 
-        selected = selected && selected.getFullYear() == year && selected.getMonth() == month ? selected.getDate() : 0;
-
-        UI_MONTH_VIEW_CLASS_SETSELECTED(this, null);
-
-        for (; o = this._aCells[i++]; ) {
-            if (month = day > 0 && day <= lastDayOfCurrMonth) {
-                if (begin > day || end < day) {
-                    o.disable();
+            for (; o = this._aCells[i++]; ) {
+                if (month = day > 0 && day <= lastDayOfCurrMonth) {
+                    currDate.setDate(day);
+                    if ((!rangeBegin || rangeBegin <= currDate) 
+                        && (!rangeEnd || rangeEnd >= currDate)) {
+                        o.enable();
+                    }
+                    else {
+                        o.disable();
+                    }
                 }
                 else {
-                    o.enable();
-                    //恢复选择的日期
-                    if (day == selected) {
-                        UI_MONTH_VIEW_CLASS_SETSELECTED(this, o);
-                    }
+                    o.disable();
+                }
+
+                if (i == 36 || i == 43) {
+                    (o.isDisabled() ? addClass : removeClass)(getParent(o.getOuter()), this.getType() + '-extra');
+                }
+
+                setText(
+                    o.getBody(),
+                    month ? day : day > lastDayOfCurrMonth ? day - lastDayOfCurrMonth : lastDayOfLastMonth + day
+                );
+                o._nDay = day++;
+            }
+        };
+
+        UI_MONTH_VIEW_CLASS.setRange = function (begin, end) {
+            var o, i, range;
+                currDate = new DATE(this._nYear, this._nMonth, 1),
+                lastDayOfCurrMonth = new DATE(this._nYear, this._nMonth + 1, 0).getDate();
+
+            if (begin) {
+                if (this._oRange.begin) {
+                    begin = UI_MONTH_VIEW_COMPARE(begin, this._oRange.begin) ? begin : this._oRange.begin;
                 }
             }
             else {
-                o.disable();
+                begin = this._oRange.begin;
+            }
+            if (end) {
+                if (this._oRange.end) {
+                    end = UI_MONTH_VIEW_COMPARE(this._oRange.end, end) ? end : this._oRange.end;
+                }
+            }
+            else {
+                end = this._oRange.end;
             }
 
-            if (i == 36 || i == 43) {
-                (o.isDisabled() ? addClass : removeClass)(getParent(o.getOuter()), this.getType() + '-extra');
+            for (i = 0; o = this._aCells[i++];) {
+                if (o._nDay > 0 && o._nDay <= lastDayOfCurrMonth) {
+                    currDate.setDate(o._nDay);
+                    if ((!begin || UI_MONTH_VIEW_COMPARE(currDate, begin)) 
+                        && (!end || UI_MONTH_VIEW_COMPARE(end ,currDate))) {
+                        o.enable();
+                    }
+                    else {
+                        o.disable();
+                    }
+                }
             }
 
-            setText(
-                o.getBody(),
-                month ? day : day > lastDayOfCurrMonth ? day - lastDayOfCurrMonth : lastDayOfLastMonth + day
-            );
-            o._nDay = day++;
-        }
+            this._oCurRange.begin = begin;
+            this._oCurRange.end = end;
+        };
     };
 //{/if}//
 //{if 0}//
 })();
+//{/if}//

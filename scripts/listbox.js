@@ -50,7 +50,7 @@ _eInput - 选项对应的input，form提交时使用
             UI_PANEL,
             'ui-listbox',
             function (el, options) {
-                options.hScroll = false;
+                
             },
             function (el, options) {
                 this._sName = options.name || '';
@@ -122,7 +122,7 @@ _eInput - 选项对应的input，form提交时使用
      * @param {boolean} status 是否选中，默认为选中
      */
     UI_LISTBOX_ITEM_CLASS.setSelected = function (status) {
-        this.alterClass('selected', this._eInput.disabled = status === false);
+        this.alterClass((this._eInput.disabled = status === false) ? '-selected' : '+selected');
     };
 
     /**
@@ -180,7 +180,19 @@ _eInput - 选项对应的input，form提交时使用
             o.setSelected();
         }
     };
-
+/*    
+    UI_LISTBOX_CLASS.empty = function () {
+        for (var i = 0, list = this.getItems(), o; o = list[i++]; ) {
+            this.remove(o);
+        }
+    };
+*/
+    UI_LISTBOX_CLASS.getIds = function () {
+        var ids = [];
+        for (var i = 0, list = this.getItems(), o; o = list[i++]; ) {
+            console.log(o.getMain());
+        }
+    };
     /**
      * 设置控件的表单项名称。
      * 多选框控件可以在表单中被提交，setName 方法设置提交时用的表单项名称，表单项名称可以使用 getName 方法获取。
@@ -198,4 +210,4 @@ _eInput - 选项对应的input，form提交时使用
 //{/if}//
 //{if 0}//
 })();
-//{/if}//
+

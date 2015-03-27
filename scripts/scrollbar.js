@@ -29,7 +29,6 @@ _oRange         - 滑动按钮的合法滑动区间
 
         children = dom.children,
         blank = util.blank,
-        setDefault = util.setDefault,
         timer = util.timer,
 
         $fastCreate = core.$fastCreate,
@@ -63,8 +62,7 @@ _oRange         - 滑动按钮的合法滑动区间
             UI_CONTROL,
             'ui-scrollbar',
             function (el, options) {
-                setDefault(options, 'userSelect', false);
-                setDefault(options, 'focusable', false);
+                options.userSelect = options.focusable = false;
 
                 var type = this.getType();
 
@@ -624,4 +622,3 @@ _oRange         - 滑动按钮的合法滑动区间
 //{/if}//
 //{if 0}//
 })();
-//{/if}//

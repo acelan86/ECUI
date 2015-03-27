@@ -23,16 +23,15 @@ _aDependents     - 所有的从属复选框
     var core = ecui,
         array = core.array,
         ui = core.ui,
-        util = core.util,
 
         undefined,
 
         remove = array.remove,
-        setDefault = util.setDefault,
 
         $connect = core.$connect,
         getKey = core.getKey,
         inheritsControl = core.inherits,
+        query = core.query,
 
         UI_INPUT_CONTROL = ui.InputControl,
         UI_INPUT_CONTROL_CLASS = UI_INPUT_CONTROL.prototype;
@@ -53,8 +52,8 @@ _aDependents     - 所有的从属复选框
             UI_INPUT_CONTROL,
             'ui-checkbox',
             function (el, options) {
-                setDefault(options, 'hidden', true);
-                setDefault(options, 'inputType', 'checkbox');
+                options.hidden = true;
+                options.inputType = 'checkbox';
             },
             function (el, options) {
                 // 保存节点选中状态，用于修复IE6/7下移动DOM节点时选中状态发生改变的问题
@@ -110,6 +109,7 @@ _aDependents     - 所有的从属复选框
         }
     }
 
+
     /**
      * 控件点击时改变当前的选中状态。
      * @override
@@ -119,9 +119,6 @@ _aDependents     - 所有的从属复选框
         this.setChecked(!!this._nStatus);
     };
 
-    /**
-     * @override
-     */
     UI_CHECKBOX_CLASS.$dispose = function () {
         this.setSubject();
         for (var i = 0, o; o = this._aDependents[i++]; ) {
@@ -211,6 +208,37 @@ _aDependents     - 所有的从属复选框
     };
 
     /**
+     * 选中全局中name = name 的checkbox
+     * @param  {[type]} name [description]
+     * @return {[type]}      [description]
+     */
+    UI_CHECKBOX.getItems = function (name) {
+        return query({type: UI_CHECKBOX, custom: function (control) {
+            return control.getName() == name;
+        }});
+    };
+    UI_CHECKBOX.setValue = function (name, value) {
+        function inArray(array, v) {
+            var i = 0,
+                a;
+            while (a = array[i++]) {
+                if (a + '' == v) {
+                    return true;
+                }
+            }
+            return false;
+        }
+        query({
+            type: UI_CHECKBOX,
+            custom: function (control) {
+                if (control.getName() == name && inArray(value, control.getValue())) {
+                    control.setChecked(true);
+                }
+            }
+        });
+    };
+
+    /**
      * 设置主复选框。
      * setSubject 方法指定主复选框控件后，可以通过访问主复选框控件的 getDependents 方法获取列表，列表中即包含了当前的控件。请注意，控件从 DOM 树上被移除时，不会自动解除主从关系，联动可能出现异情，此时请调用 setSubject 方法传入空参数解除主从关系。
      * @public
@@ -237,4 +265,3 @@ _aDependents     - 所有的从属复选框
 //{/if}//
 //{if 0}//
 })();
-//{/if}//

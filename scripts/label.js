@@ -15,9 +15,10 @@ _cFor - 被转发的控件对象
         ui = core.ui,
         util = core.util,
 
-        inherits = util.inherits,
-
+        inheritsControl = core.inherits,
         $connect = core.$connect,
+        triggerEvent = core.triggerEvent,
+        blank = util.blank,
 
         UI_CONTROL = ui.Control,
         UI_CONTROL_CLASS = UI_CONTROL.prototype;
@@ -32,13 +33,16 @@ _cFor - 被转发的控件对象
      * @param {Object} options 初始化选项
      */
     //__gzip_original__UI_LABEL
-    var UI_LABEL =
-        ui.Label = function (el, options) {
-            UI_CONTROL.call(this, el, options);
-
-            $connect(this, this.setFor, options['for']);
-        },
-        UI_LABEL_CLASS = inherits(UI_LABEL, UI_CONTROL);
+    var UI_LABEL = ui.Label = inheritsControl(
+            UI_CONTROL,
+            'ui-label',
+            null,
+            function (el, options) {
+                this._bResizable = false;
+                $connect(this, this.setFor, options['for']);
+            }
+        ),
+        UI_LABEL_CLASS = UI_LABEL.prototype;
 //{else}//
     /**
      * 鼠标单击控件事件的默认处理。
@@ -51,7 +55,7 @@ _cFor - 被转发的控件对象
         //__gzip_original__control
         var control = this._cFor;
         if (control) {
-            control.click(event);
+            triggerEvent(control, 'click', event);
         }
     };
 
@@ -65,7 +69,9 @@ _cFor - 被转发的控件对象
     UI_LABEL_CLASS.setFor = function (control) {
         this._cFor = control;
     };
+
+
+    UI_LABEL_CLASS.$setSize = blank;
 //{/if}//
 //{if 0}//
 })();
-//{/if}//

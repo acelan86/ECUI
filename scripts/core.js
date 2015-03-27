@@ -342,8 +342,15 @@
                     event = wrapEvent(event);
 
                     //__transform__target_o
-                    var target = currEnv.target;
-                    triggerEvent(target, 'dragend', event);
+                    var target = currEnv.target,
+                        //by acelan移动结束时也需要知道它相对位置
+                        // 计算期待移到的位置
+                        expectX = target.getX() + mouseX - currEnv.x,
+                        expectY = target.getY() + mouseY - currEnv.y,
+                        // 计算实际允许移到的位置
+                        x = MIN(MAX(expectX, currEnv.left), currEnv.right),
+                        y = MIN(MAX(expectY, currEnv.top), currEnv.bottom);
+                    triggerEvent(target, 'dragend', event, [x, y]);
                     activedControl = currEnv.actived;
                     restore();
 
@@ -451,7 +458,7 @@
                         list = [],
                         options = el.all || el.getElementsByTagName('*'),
                         elements = [el],
-                        o;
+                        o, namedMap = {};
 
                     if (!(initRecursion++)) {
                         // 第一层 init 循环的时候需要关闭resize事件监听，防止反复的重入
@@ -470,6 +477,9 @@
                         if (o = options.type) {
                             options.main = el;
                             list.push($create(ui[toCamelCase(o.charAt(0).toUpperCase() + o.slice(1))], options));
+                            if (options.id) {
+                                 namedMap[options.id] = list[list.length - 1];
+                            }
                         }
                     }
 
@@ -484,6 +494,8 @@
                     if (!(--initRecursion)) {
                         attachEvent(WINDOW, 'resize', repaint);
                     }
+
+                    return namedMap;
                 }
             },
 
@@ -530,7 +542,10 @@
                     }
 
                     for (i = 0; o = list[i++]; ) {
+                        // 避免在resize中调用repaint从而引起反复的reflow
+                        o.repaint = blank;
                         triggerEvent(o, 'resize');
+                        delete o.repaint;
 
                         if (ieVersion < 8) {
                             // 修复ie6/7下宽度自适应错误的问题
@@ -836,6 +851,15 @@
          * @param {ecui.ui.Control|HTMLElement} control 需要释放的控件对象或包含控件的 Element 对象
          */
         disposeControl = core.dispose = function (control) {
+            function logicContain(el, control) {
+                while (control) {
+                    if (contain(el, control.getOuter())) {
+                        return true;
+                    }
+                    control = control.getParent();
+                }
+            }
+
             var i = allControls.length,
 //{if 0}//
                 type = control instanceof ui.Control,
@@ -850,13 +874,13 @@
             }
             else {
                 o = findControl(getParent(control));
-                if (focusedControl && contain(control, focusedControl.getOuter())) {
+                if (focusedControl && logicContain(control, focusedControl)) {
                     setFocused(o);
                 }
-                if (activedControl && contain(control, activedControl.getOuter())) {
+                if (activedControl && logicContain(control, activedControl)) {
                     bubble(activedControl, 'deactivate', null, activedControl = o);
                 }
-                if (hoveredControl && contain(control, hoveredControl.getOuter())) {
+                if (hoveredControl && logicContain(control, hoveredControl)) {
                     bubble(hoveredControl, 'mouseout', null, hoveredControl = o);
                 }
             }
@@ -867,7 +891,7 @@
 
             for (; i--; ) {
                 o = allControls[i];
-                if (type ? control.contain(o) : !!o.getOuter() && contain(control, o.getOuter())) {
+                if (type ? control.contain(o) : !!o.getOuter() && logicContain(control, o)) {
                     // 需要删除的控件先放入一个集合中等待遍历结束后再删除，否则控件链将产生变化
                     controls.push(o);
                     remove(independentControls, o);
@@ -1044,11 +1068,6 @@
 
             if (text) {
                 el.removeAttribute(attributeName);
-                if (core.onparseoptions) {
-                    if (options = core.onparseoptions(text)) {
-                        return options;
-                    }
-                }
 
                 for (
                     options = {};
@@ -1061,6 +1080,8 @@
                     attributeName[toCamelCase(REGEXP.$3)] =
                         !el || el == 'true' ? true : el == 'false' ? false : ISNAN(+el) ? el : +el;
                 }
+
+                core.onparseoptions && core.onparseoptions(options);
 
                 return options;
             }
@@ -1102,7 +1123,7 @@
          * @return {Function} 新控件的构造函数
          */
         inheritsControl = core.inherits = function (superClass, type, preprocess, subClass) {
-            var agent = function (options) {
+                var agent = function (options) {
                     return createControl(agent.client, options);
                 },
                 client = agent.client = function (el, options) {
@@ -1856,4 +1877,3 @@
 //{/if}//
 //{if 0}//
 })();
-//{/if}//

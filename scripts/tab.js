@@ -139,7 +139,8 @@ _eContainer      - 容器 DOM 元素
                     }
 
                     setStyle(el, 'display', 'inline-block');
-
+                    // 20140826 修复TAB标签宽度的问题
+                    setStyle(el, 'width', 'auto');
                     if (parent && options.selected) {
                         parent._oSelected = this;
                     }
@@ -331,7 +332,7 @@ _eContainer      - 容器 DOM 元素
      * @override
      */
     UI_TAB_CLASS.$setSize = function (width, height) {
-        UI_CONTROL_CLASS.$setSize.call(this, width, height);
+        UI_CONTROL_CLASS.$setSize.call(this, width);
 
         //__gzip_original__prev
         //__gzip_original__next
@@ -443,4 +444,4 @@ _eContainer      - 容器 DOM 元素
 //{/if}//
 //{if 0}//
 })();
-//{/if}//
+
